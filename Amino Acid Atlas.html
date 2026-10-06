@@ -1,0 +1,392 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Amino Acid Atlas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a bench-top viewer for the selected residue, then the full set of 21 as a specimen grid below */
+:root{
+  --bg:#eef1f4; --surface:#ffffff; --sunk:#e3e8ee; --line:#cfd7e0;
+  --fg:#16202b; --muted:#5b6876; --accent:#2f5bd3;
+  /* attachment-point colors */
+  --k-nterm:#6b4ce6; --k-cterm:#d27a12; --k-leave:#c23a3a; --k-calpha:#11907e; --k-site:#c02d8f; --k-hydro:#7b8a22;
+  /* CPK atoms */
+  --a-C:#4b535c; --a-N:#2f63e0; --a-O:#e0332f; --a-S:#e3b51b; --a-Se:#e07b14; --a-H:#f4f6f8; --a-Hstroke:#9aa5b1;
+  --canvas:#f7f9fb; --label-bg:#ffffffee;
+  --f-display:"Archivo", "Helvetica Neue", Arial, sans-serif;
+  --f-body:"Public Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0d131a; --surface:#141c25; --sunk:#0a0f15; --line:#25313e;
+  --fg:#e3e9ef; --muted:#8c9aa8; --accent:#7f9dff;
+  --k-nterm:#9b85ff; --k-cterm:#f0a144; --k-leave:#ff6b6b; --k-calpha:#33c7b0; --k-site:#ff5cc4; --k-hydro:#b6c94a;
+  --a-C:#a7b1bc; --a-N:#6a93ff; --a-O:#ff5a52; --a-S:#f2cb3d; --a-Se:#ff9b40; --a-H:#e8edf2; --a-Hstroke:#56616d;
+  --canvas:#0f161e; --label-bg:#141c25ee; color-scheme:dark;
+}}
+:root[data-theme="dark"]{
+  --bg:#0d131a; --surface:#141c25; --sunk:#0a0f15; --line:#25313e;
+  --fg:#e3e9ef; --muted:#8c9aa8; --accent:#7f9dff;
+  --k-nterm:#9b85ff; --k-cterm:#f0a144; --k-leave:#ff6b6b; --k-calpha:#33c7b0; --k-site:#ff5cc4; --k-hydro:#b6c94a;
+  --a-C:#a7b1bc; --a-N:#6a93ff; --a-O:#ff5a52; --a-S:#f2cb3d; --a-Se:#ff9b40; --a-H:#e8edf2; --a-Hstroke:#56616d;
+  --canvas:#0f161e; --label-bg:#141c25ee; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:15px;line-height:1.5}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:20px;padding-block:28px 64px;display:flex;flex-direction:column;gap:28px}
+header{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:16px 32px}
+h1{font-family:var(--f-display);font-variation-settings:"wdth" 118;font-weight:780;font-size:clamp(28px,4.2vw,44px);letter-spacing:-.01em;line-height:1;margin:0;text-wrap:balance}
+h1 small{display:block;font-family:var(--f-mono);font-weight:400;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:10px}
+.lede{max-width:56ch;color:var(--muted);margin:0}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.dot{width:10px;height:10px;border-radius:50%;border:2px solid var(--c);flex:none}
+.dot.dash{border-style:dashed}
+
+/* ---- bench viewer ---- */
+.bench{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:0;background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.stage{position:relative;background:var(--canvas);border-right:1px solid var(--line);min-height:0}
+.stage canvas{display:block;width:100%;aspect-ratio:4/3.1;touch-action:none;cursor:grab}
+.stage canvas:active{cursor:grabbing}
+.tools{position:absolute;left:12px;right:12px;bottom:12px;display:flex;flex-wrap:wrap;gap:6px;justify-content:space-between;align-items:center;pointer-events:none}
+.tools .grp{display:flex;gap:6px;flex-wrap:wrap;pointer-events:auto}
+.tbtn{font:500 12.5px var(--f-body);color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:5px 11px;cursor:pointer}
+.tbtn[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.tbtn:focus-visible,.card:focus-visible,.chip:focus-visible,.mark:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.hint{font:12px var(--f-mono);color:var(--muted);pointer-events:none}
+.info{padding:24px 24px 22px;display:flex;flex-direction:column;gap:16px;min-width:0}
+.idrow{display:flex;align-items:center;gap:16px}
+.big1{font-family:var(--f-display);font-variation-settings:"wdth" 70;font-weight:800;font-size:64px;line-height:.85;color:var(--accent)}
+.idrow h2{font-family:var(--f-display);font-variation-settings:"wdth" 108;font-weight:700;font-size:26px;margin:0;line-height:1.1}
+.idrow .sub{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);margin-top:4px}
+.facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.facts div{background:var(--surface);padding:8px 10px;min-width:0}
+.facts dt{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.facts dd{margin:2px 0 0;font-family:var(--f-mono);font-size:13.5px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.blurb{margin:0;max-width:62ch}
+.marks-h{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:2px 0 -6px}
+.marks{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+.mark{display:grid;grid-template-columns:14px minmax(0,1fr);gap:4px 10px;align-items:start;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:var(--surface);cursor:pointer;text-align:left;width:100%;font:inherit;color:inherit}
+.mark:hover,.mark.on{border-color:var(--c);background:color-mix(in srgb,var(--c) 8%,var(--surface))}
+.mark .dot{margin-top:5px}
+.mark b{font-weight:600;font-size:14px}
+.mark b em{font-style:normal;font-family:var(--f-mono);font-size:11px;font-weight:400;color:var(--c);margin-left:6px;text-transform:uppercase;letter-spacing:.05em}
+.mark p{grid-column:2;margin:0;font-size:13px;color:var(--muted);line-height:1.45}
+.peptide{font-size:13px;color:var(--muted);border-top:1px dashed var(--line);padding-top:12px;margin:0}
+.peptide code{font-family:var(--f-mono);font-size:12px;color:var(--fg)}
+
+/* ---- grid ---- */
+.gridhead{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center;justify-content:space-between}
+.gridhead h3{font-family:var(--f-display);font-variation-settings:"wdth" 112;font-weight:700;font-size:20px;margin:0}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:500 13px var(--f-body);color:var(--fg);background:transparent;border:1px solid var(--line);border-radius:999px;padding:5px 12px;cursor:pointer;display:inline-flex;gap:7px;align-items:center}
+.chip i{width:8px;height:8px;border-radius:2px;background:var(--c,var(--muted))}
+.chip[aria-pressed="true"]{background:var(--fg);color:var(--bg);border-color:var(--fg)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px}
+.card{position:relative;display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:0;cursor:pointer;text-align:left;font:inherit;color:inherit;overflow:hidden;transition:border-color .15s,transform .15s}
+.card:hover{border-color:var(--muted);transform:translateY(-2px)}
+.card.sel{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.card canvas{display:block;width:100%;aspect-ratio:1;background:var(--canvas)}
+.card .meta{display:flex;align-items:baseline;gap:10px;padding:9px 12px 11px;border-top:1px solid var(--line)}
+.card .l1{font-family:var(--f-display);font-variation-settings:"wdth" 70;font-weight:800;font-size:26px;line-height:1;color:var(--cc)}
+.card .nm{font-weight:600;font-size:14px;line-height:1.2;min-width:0}
+.card .nm span{display:block;font-family:var(--f-mono);font-weight:400;font-size:11px;color:var(--muted);margin-top:2px}
+.card .tag{position:absolute;top:8px;left:8px;font:600 10px var(--f-mono);letter-spacing:.06em;text-transform:uppercase;padding:2px 7px;border-radius:5px;color:var(--cc);background:color-mix(in srgb,var(--cc) 13%,transparent)}
+.cls-nonpolar{--cc:#6d7a2a} .cls-aromatic{--cc:#8a4fd1} .cls-polar{--cc:#11907e} .cls-acidic{--cc:#c23a3a} .cls-basic{--cc:#2f5bd3} .cls-special{--cc:#c06a0c}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .cls-nonpolar{--cc:#b6c94a} :root:not([data-theme="light"]) .cls-aromatic{--cc:#b994ff} :root:not([data-theme="light"]) .cls-polar{--cc:#33c7b0} :root:not([data-theme="light"]) .cls-acidic{--cc:#ff6b6b} :root:not([data-theme="light"]) .cls-basic{--cc:#7f9dff} :root:not([data-theme="light"]) .cls-special{--cc:#f0a144} }
+:root[data-theme="dark"] .cls-nonpolar{--cc:#b6c94a} :root[data-theme="dark"] .cls-aromatic{--cc:#b994ff} :root[data-theme="dark"] .cls-polar{--cc:#33c7b0} :root[data-theme="dark"] .cls-acidic{--cc:#ff6b6b} :root[data-theme="dark"] .cls-basic{--cc:#7f9dff} :root[data-theme="dark"] .cls-special{--cc:#f0a144}
+footer{font-size:12.5px;color:var(--muted);max-width:80ch}
+
+@media (max-width:860px){
+  .bench{grid-template-columns:minmax(0,1fr)}
+  .stage{border-right:0;border-bottom:1px solid var(--line)}
+  .stage canvas{aspect-ratio:1/1}
+}
+@media (max-width:480px){
+  .wrap{padding-inline:16px}
+  .facts{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .big1{font-size:52px}
+  .info{padding:18px 16px}
+}
+@media (prefers-reduced-motion: reduce){ .card{transition:none} .card:hover{transform:none} }
+</style>
+
+<div class="wrap">
+  <header>
+    <div>
+      <h1><small>21 proteinogenic amino acids · L-form · 3D ball-and-stick</small>Amino Acid Atlas</h1>
+    </div>
+    <p class="lede">Pick any residue to inspect it in 3D. Drag to rotate, scroll or pinch to zoom. Rings mark where it joins a peptide chain and where its side chain reacts.</p>
+  </header>
+
+  <section class="bench" aria-label="Selected amino acid">
+    <div class="stage">
+      <canvas id="main" aria-label="3D model of the selected amino acid"></canvas>
+      <div class="tools">
+        <div class="grp">
+          <button class="tbtn" id="tLabels" aria-pressed="true">Labels</button>
+          <button class="tbtn" id="tH" aria-pressed="true">Hydrogens</button>
+          <button class="tbtn" id="tSpin" aria-pressed="true">Spin</button>
+          <button class="tbtn" id="tReset">Reset view</button>
+        </div>
+        <span class="hint" id="hint">Reset: N-terminus left, C-terminus right</span>
+      </div>
+    </div>
+    <div class="info" id="info"></div>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:14px">
+    <div class="gridhead">
+      <h3>All residues</h3>
+      <div class="chips" id="chips"></div>
+    </div>
+    <div class="legend" aria-label="Legend">
+      <span><i class="dot" style="--c:var(--k-nterm)"></i>α-amino N (joins previous residue)</span>
+      <span><i class="dot" style="--c:var(--k-cterm)"></i>Carboxyl C (joins next residue)</span>
+      <span><i class="dot dash" style="--c:var(--k-leave)"></i>Leaves as H₂O</span>
+      <span><i class="dot" style="--c:var(--k-calpha)"></i>Cα</span>
+      <span><i class="dot" style="--c:var(--k-site)"></i>Reactive / modification site</span>
+      <span><i class="dot" style="--c:var(--k-hydro)"></i>Hydrophobic contact</span>
+    </div>
+    <div class="grid" id="grid"></div>
+  </section>
+
+  <footer>Geometries are energy-minimised (MMFF94) single conformers of the neutral form, generated with RDKit; in water at pH 7 the backbone is a zwitterion (NH₃⁺ / COO⁻). Side-chain pKa values are typical free-residue figures and shift inside folded proteins. Atom colours follow the CPK convention: carbon grey, nitrogen blue, oxygen red, sulfur yellow, selenium orange, hydrogen white.</footer>
+</div>
+
+<script>
+const DATA = [{"code3":"Gly","code1":"G","name":"Glycine","cls":"nonpolar","mw":75.07,"pka":null,"fact":"The only achiral amino acid. With just a hydrogen as its side chain it is the most flexible residue and common in tight turns and collagen (every third residue).","atoms":[["N",-0.713,0.422,-1.219],["C",-0.47,-0.599,-0.186],["C",0.786,-0.292,0.617],["O",1.533,-1.11,1.13],["O",0.991,1.032,0.809],["H",-1.678,0.355,-1.536],["H",-0.61,1.341,-0.78],["H",-1.314,-0.64,0.509],["H",-0.348,-1.571,-0.671],["H",1.823,1.062,1.326]],"bonds":[[0,1,1.0],[1,2,1.0],[2,3,2.0],[2,4,1.0],[0,5,1.0],[0,6,1.0],[1,7,1.0],[1,8,1.0],[4,9,1.0]],"marks":[{"atoms":[0],"label":"\u03b1-Amino N","kind":"nterm","note":"N-terminal attachment point. Its lone pair attacks the previous residue's carboxyl carbon to form the peptide bond."},{"atoms":[2],"label":"Carboxyl C","kind":"cterm","note":"C-terminal attachment point. Becomes the carbonyl carbon of the peptide bond (C\u2013N)."},{"atoms":[4],"label":"Leaving OH","kind":"leave","note":"This hydroxyl plus one amine H leave as water during condensation. In cells the carboxyl is first activated as an aminoacyl-tRNA ester."},{"atoms":[1],"label":"C\u03b1","kind":"calpha","note":"Achiral: carries two hydrogens. Links the backbone to the side chain."}],"nH":[5,6],"chir":"-"},{"code3":"Ala","code1":"A","name":"Alanine","cls":"nonpolar","mw":89.09,"pka":null,"fact":"A single methyl side chain. Small, hydrophobic and one of the strongest helix-forming residues.","atoms":[["N",-0.824,1.106,-0.742],["C",-0.351,0.233,0.358],["C",-1.094,-1.094,0.302],["C",1.165,0.008,0.276],["O",1.797,-0.905,0.782],["O",1.814,0.978,-0.41],["H",-0.661,0.63,-1.63],["H",-0.196,1.915,-0.772],["H",-0.553,0.738,1.308],["H",-0.801,-1.738,1.139],["H",-2.178,-0.943,0.363],["H",-0.874,-1.639,-0.622],["H",2.756,0.711,-0.352]],"bonds":[[0,1,1.0],[1,2,1.0],[1,3,1.0],[3,4,2.0],[3,5,1.0],[0,6,1.0],[0,7,1.0],[1,8,1.0],[2,9,1.0],[2,10,1.0],[2,11,1.0],[5,12,1.0]],"marks":[{"atoms":[0],"label":"\u03b1-Amino N","kind":"nterm","note":"N-terminal attachment point. Its lone pair attacks the previous residue's carboxyl carbon to form the peptide bond."},{"atoms":[3],"label":"Carboxyl C","kind":"cterm","note":"C-terminal attachment point. Becomes the carbonyl carbon of the peptide bond (C\u2013N)."},{"atoms":[5],"label":"Leaving OH","kind":"leave","note":"This hydroxyl plus one amine H leave as water during condensation. In cells the carboxyl is first activated as an aminoacyl-tRNA ester."},{"atoms":[1],"label":"C\u03b1","kind":"calpha","note":"Chiral centre, S configuration (L-form). Links the backbone to the side chain."},{"atoms":[2],"label":"C\u03b2 methyl","kind":"hydro","note":"Small hydrophobic group; strong \u03b1-helix former."}],"nH":[6,7],"chir":"S"},{"code3":"Val","code1":"V","name":"Valine","cls":"nonpolar","mw":117.15,"pka":null,"fact":"\u03b2-branched hydrophobic residue that packs into protein cores and prefers \u03b2-sheets.","atoms":[["N",1.063,1.765,0.039],["C",0.674,0.4,0.459],["C",-0.61,-0.106,-0.246],["C",-0.999,-1.507,0.247],["C",-1.805,0.833,-0.034],["C",1.849,-0.55,0.179],["O",2.269,-1.423,0.922],["O",2.396,-0.377,-1.048],["H",1.314,1.731,-0.952],["H",0.277,2.403,0.124],["H",0.526,0.424,1.545],["H",-0.425,-0.177,-1.327],["H",-1.927,-1.844,-0.229],["H",-1.153,-1.516,1.331],["H",-0.229,-2.246,0.005],["H",-1.65,1.798,-0.525],["H",-2.718,0.404,-0.462],["H",-1.983,1.012,1.031],["H",3.132,-1.022,-1.06]],"bonds":[[0,1,1.0],[1,2,1.0],[2,3,1.0],[2,4,1.0],[1,5,1.0],[5,6,2.0],[5,7,1.0],[0,8,1.0],[0,9,1.0],[1,10,1.0],[2,11,1.0],[3,12,1.0],[3,13,1.0],[3,14,1.0],[4,15,1.0],[4,16,1.0],[4,17,1.0],[7,18,1.0]],"marks":[{"atoms":[0],"label":"\u03b1-Amino N","kind":"nterm","note":"N-terminal attachment point. Its lone pair attacks the previous residue's carboxyl carbon to form the peptide bond."},{"atoms":[5],"label":"Carboxyl C","kind":"cterm","note":"C-terminal attachment point. Becomes the carbonyl carbon of the peptide bond (C\u2013N)."},{"atoms":[7],"label":"Leaving OH","kind":"leave","note":"This hydroxyl plus one amine H leave as water during condensation. In cells the carboxyl is first activated as an aminoacyl-tRNA ester."},{"atoms":[1],"label":"C\u03b1","kind":"calpha","note":"Chiral centre, S configuration (L-form). Links the backbone to the side chain."},{"atoms":[2],"label":"Branched C\u03b2","kind":"hydro","note":"\u03b2-branching restricts backbone rotation; favours \u03b2-sheets."}],"nH":[8,9],"chir":"S"},{"code3":"Leu","code1":"L","name":"Leucine","cls":"nonpolar","mw":131.18,"pka":null,"fact":"The most common amino acid in proteins. Its isobutyl group drives hydrophobic core packing and coiled-coil (leucine zipper) interfaces.","atoms":[["N",2.384,-1.338,-0.461],["C",1.147,-0.56,-0.707],["C",0.291,-0.54,0.572],["C",-1.213,-0.275,0.334],["C",-1.977,-0.431,1.653],["C",-1.51,1.099,-0.265],["C",1.562,0.82,-1.238],["O",1.897,1.051,-2.392],["O",1.629,1.796,-0.314],["H",2.136,-2.302,-0.243],["H",2.921,-1.372,-1.329],["H",0.583,-1.055,-1.506],["H",0.686,0.18,1.299],["H",0.366,-1.525,1.056],["H",-1.592,-1.036,-0.36],["H",-3.053,-0.299,1.499],["H",-1.824,-1.43,2.076],["H",-1.646,0.306,2.393],["H",-1.106,1.188,-1.277],["H",-2.591,1.263,-0.339],["H",-1.092,1.901,0.351],["H",2.0,2.558,-0.804]],"bonds":[[0,1,1.0],[1,2,1.0],[2,3,1.0],[3,4,1.0],[3,5,1.0],[1,6,1.0],[6,7,2.0],[6,8,1.0],[0,9,1.0],[0,10,1.0],[1,11,1.0],[2,12,1.0],[2,13,1.0],[3,14,1.0],[4,15,1.0],[4,16,1.0],[4,17,1.0],[5,18,1.0],[5,19,1.0],[5,20,1.0],[8,21,1.0]],"marks":[{"atoms":[0],"label":"\u03b1-Amino N","kind":"nterm","note":"N-terminal attachment point. Its lone pair attacks the previous residue's carboxyl carbon to form the peptide bond."},{"atoms":[6],"label":"Carboxyl C","kind":"cterm","note":"C-terminal attachment point. Becomes the carbonyl carbon of the peptide bond (C\u2013N)."},{"atoms":[8],"label":"Leaving OH","kind":"leave","note":"This hydroxyl plus one amine H leave as water during condensation. In cells the carboxyl is first activated as an aminoacyl-tRNA ester."},{"atoms":[1],"label":"C\u03b1","kind":"calpha","note":"Chiral centre, S configuration (L-form). Links the backbone to the side chain."},{"atoms":[3],"label":"Isobutyl C\u03b3","kind":"hydro","note":"Core packing; leucine zippers in DNA-binding proteins."}],"nH":[9,10],"chir":"S"},{"code3":"Ile","code1":"I","name":"Isoleucine","cls":"nonpolar","mw":131.18,"pka":null,"fact":"Has a second stereocentre at C\u03b2. A \u03b2-branched hydrophobic residue found in protein cores and \u03b2-sheets.","atoms":[["N",1.948,-1.107,-1.194],["C",1.079,0.057,-0.894],["C",-0.294,-0.373,-0.315],["C",-0.176,-1.097,1.033],["C",-1.254,0.834,-0.226],["C",-2.698,0.442,0.058],["C",1.819,1.045,0.022],["O",1.651,2.253,0.071],["O",2.689,0.447,0.87],["H",1.38,-1.896,-1.495],["H",2.404,-1.388,-0.322],["H",0.927,0.571,-1.851],["H",-0.735,-1.085,-1.027],["H",0.155,-0.418,1.826],["H",0.53,-1.931,0.982],["H",-1.139,-1.519,1.337],["H",-1.233,1.381,-1.176],["H",-0.922,1.531,0.552],["H",-3.061,-0.284,-0.676],["H",-3.343,1.326,0.006],["H",-2.811,0.012,1.057],["H",3.082,1.199,1.361]],"bonds":[[0,1,1.0],[1,2,1.0],[2,3,1.0],[2,4,1.0],[4,5,1.0],[1,6,1.0],[6,7,2.0],[6,8,1.0],[0,9,1.0],[0,10,1.0],[1,11,1.0],[2,12,1.0],[3,13,1.0],[3,14,1.0],[3,15,1.0],[4,16,1.0],[4,17,1.0],[5,18,1.0],[5,19,1.0],[5,20,1.0],[8,21,1.0]],"marks":[{"atoms":[0],"label":"\u03b1-Amino N","kind":"nterm","note":"N-terminal attachment point. Its lone pair attacks the previous residue's carboxyl carbon to form the peptide bond."},{"atoms":[6],"label":"Carboxyl C","kind":"cterm","note":"C-terminal attachment point. Becomes the carbonyl carbon of the peptide bond (C\u2013N)."},{"atoms":[8],"label":"Leaving OH","kind":"leave","note":"This hydroxyl plus one amine H leave as water during condensation. In cells the carboxyl is first activated as an aminoacyl-tRNA ester."},{"atoms":[1],"label":"C\u03b1","kind":"calpha","note":"Chiral centre, S configuration (L-form). Links the backbone to the side chain."},{"atoms":[5],"label":"sec-Butyl C\u03b4","kind":"hydro","note":"Hydrophobic contact; second stereocentre at C\u03b2."}],"nH":[9,10],"chir":"S"},{"code3":"Met","code1":"M","name":"Methionine","cls":"nonpolar","mw":149.22,"pka":null,"fact":"Coded by AUG, so it starts nearly every protein. Its thioether sulfur is an oxidation sensor and the methyl donor in S-adenosylmethionine.","atoms":[["N",-1.595,-2.004,0.152],["C",-1.216,-0.58,0.332],["C",0.132,-0.34,-0.359],["C",0.73,1.024,-0.01],["S",2.361,1.28,-0.79],["C",3.369,0.183,0.239],["C",-2.318,0.311,-0.254],["O",-3.121,-0.004,-1.119],["O",-2.351,1.541,0.295],["H",-1.762,-2.162,-0.847],["H",-2.509,-2.154,0.584],["H",-1.148,-0.394,1.41],["H",0.012,-0.42,-1.448],["H",0.826,-1.131,-0.052],["H",0.825,1.152,1.073],["H",0.088,1.827,-0.381],["H",3.107,-0.863,0.066],["H",3.243,0.427,1.297],["H",4.421,0.319,-0.023],["H",-3.094,1.988,-0.164]],"bonds":[[0,1,1.0],[1,2,1.0],[2,3,1.0],[3,4,1.0],[4,5,1.0],[1,6,1.0],[6,7,2.0],[6,8,1.0],[0,9,1.0],[0,10,1.0],[1,11,1.0],[2,12,1.0],[2,13,1.0],[3,14,1.0],[3,15,1.0],[5,16,1.0],[5,17,1.0],[5,18,1.0],[8,19,1.0]],"marks":[{"atoms":[0],"label":"\u03b1-Amino N","kind":"nterm","note":"N-terminal attachment point. Its lone pair attacks the previous residue's carboxyl carbon to form the peptide bond."},{"atoms":[6],"label":"Carboxyl C","kind":"cterm","note":"C-terminal attachment point. Becomes the carbonyl carbon of the peptide bond (C\u2013N)."},{"atoms":[8],"label":"Leaving OH","kind":"leave","note":"This hydroxyl plus one amine H leave as water during condensation. In cells the carboxyl is first activated as an aminoacyl-tRNA ester."},{"atoms":[1],"label":"C\u03b1","kind":"calpha","note":"Chiral centre, S configuration (L-form). Links the backbone to the side chain."},{"atoms":[4],"label":"Thioether S\u03b4","kind":"site","note":"Oxidised to methionine sulfoxide by reactive oxygen species; reversible by MsrA/B."}],"nH":[9,10],"chir":"S"},{"code3":"Phe","code1":"F","name":"Phenylalanine","cls":"aromatic","mw":165.19,"pka":null,"fact":"Benzyl side chain for hydrophobic and \u03c0-stacking contacts. Para-hydroxylation converts it to tyrosine.","atoms":[["N",-2.035,-2.265,0.827],["C",-1.19,-1.044,0.765],["C",-0.829,-0.728,-0.695],["C",0.433,0.099,-0.818],["C",0.365,1.487,-0.988],["C",1.532,2.246,-1.086],["C",2.778,1.626,-1.016],["C",2.858,0.245,-0.848],["C",1.692,-0.516,-0.748],["C",-1.947,0.114,1.433],["O",-2.167,1.232,0.997],["O",-2.388,-0.222,2.673],["H",-1.461,-3.076,0.606],["H",-2.33,-2.38,1.801],["H",-0.285,-1.221,1.36],["H",-1.658,-0.223,-1.208],["H",-0.661,-1.659,-1.255],["H",-0.599,1.99,-1.041],["H",1.467,3.323,-1.217],["H",3.685,2.218,-1.094],["H",3.829,-0.24,-0.795],["H",1.772,-1.593,-0.62],["H",-2.861,0.585,2.967]],"bonds":[[0,1,1.0],[1,2,1.0],[2,3,1.0],[3,4,1.5],[4,5,1.5],[5,6,1.5],[6,7,1.5],[7,8,1.5],[1,9,1.0],[9,10,2.0],[9,11,1.0],[8,3,1.5],[0,12,1.0],[0,13,1.0],[1,14,1.0],[2,15,1.0],[2,16,1.0],[4,17,1.0],[5,18,1.0],[6,19,1.0],[7,20,1.0],[8,21,1.0],[11,22,1.0]],"marks":[{"atoms":[0],"label":"\u03b1-Amino N","kind":"nterm","note":"N-terminal attachment point. Its lone pair attacks the previous residue's carboxyl carbon to form the peptide bond."},{"atoms":[9],"label":"Carboxyl C","kind":"cterm","note":"C-terminal attachment point. Becomes the carbonyl carbon of the peptide bond (C\u2013N)."},{"atoms":[11],"label":"Leaving OH","kind":"leave","note":"This hydroxyl plus one amine H leave as water during condensation. In cells the carboxyl is first activated as an aminoacyl-tRNA ester."},{"atoms":[1],"label":"C\u03b1","kind":"calpha","note":"Chiral centre, S configuration (L-form). Links the backbone to the side chain."},{"atoms":[6],"label":"Para carbon C\u03b6","kind":"site","note":"Hydroxylated by phenylalanine hydroxylase to make tyrosine; blocked in PKU."}],"nH":[12,13],"chir":"S"},{"code3":"Tyr","code1":"Y","name":"Tyrosine","cls":"aromatic","mw":181.19,"pka":10.1,"fact":"Phenol side chain. Tyrosine phosphorylation is the core switch of growth-factor signalling.","atoms":[["N",-1.697,-1.43,1.137],["C",-1.92,-0.161,0.405],["C",-0.995,0.006,-0.813],["C",0.47,0.11,-0.455],["C",0.969,1.26,0.174],["C",2.321,1.354,0.515],["C",3.174,0.296,0.223],["O",4.5,0.344,0.538],["C",2.699,-0.85,-0.403],["C",1.349,-0.944,-0.744],["C",-3.363,-0.109,-0.096],["O",-4.037,-1.053,-0.484],["O",-3.862,1.144,-0.133],["H",-0.698,-1.544,1.308],["H",-1.977,-2.207,0.536],["H",-1.779,0.655,1.124],["H",-1.273,0.908,-1.374],["H",-1.148,-0.825,-1.515],["H",0.307,2.093,0.403],["H",2.684,2.253,1.002],["H",4.685,1.195,0.966],["H",3.379,-1.667,-0.627],["H",0.991,-1.846,-1.235],["H",-4.781,1.017,-0.451]],"bonds":[[0,1,1.0],[1,2,1.0],[2,3,1.0],[3,4,1.5],[4,5,1.5],[5,6,1.5],[6,7,1.0],[6,8,1.5],[8,9,1.5],[1,10,1.0],[10,11,2.0],[10,12,1.0],[9,3,1.5],[0,13,1.0],[0,14,1.0],[1,15,1.0],[2,16,1.0],[2,17,1.0],[4,18,1.0],[5,19,1.0],[7,20,1.0],[8,21,1.0],[9,22,1.0],[12,23,1.0]],"marks":[{"atoms":[0],"label":"\u03b1-Amino N","kind":"nterm","note":"N-terminal attachment point. Its lone pair attacks the previous residue's carboxyl carbon to form the peptide bond."},{"atoms":[10],"label":"Carboxyl C","kind":"cterm","note":"C-terminal attachment point. Becomes the carbonyl carbon of the peptide bond (C\u2013N)."},{"atoms":[12],"label":"Leaving OH","kind":"leave","note":"This hydroxyl plus one amine H leave as water during condensation. In cells the carboxyl is first activated as an aminoacyl-tRNA ester."},{"atoms":[1],"label":"C\u03b1","kind":"calpha","note":"Chiral centre, S configuration (L-form). Links the backbone to the side chain."},{"atoms":[7],"label":"Phenol O\u03b7","kind":"site","note":"Phosphorylated by tyrosine kinases (e.g. receptor tyrosine kinases); also sulfated and nitrated."}],"nH":[13,14],"chir":"S"},{"code3":"Trp","code1":"W","name":"Tryptophan","cls":"aromatic","mw":204.23,"pka":null,"fact":"The largest amino acid. Its indole ring gives proteins their UV absorbance at 280 nm and intrinsic fluorescence.","atoms":[["N",-2.012,1.175,-0.54],["C",-2.237,-0.268,-0.272],["C",-1.237,-0.825,0.755],["C",0.162,-0.933,0.217],["C",0.696,-2.015,-0.456],["N",1.996,-1.726,-0.773],["C",2.327,-0.469,-0.326],["C",3.532,0.236,-0.429],["C",3.584,1.516,0.131],["C",2.475,2.065,0.769],["C",1.279,1.345,0.864],["C",1.198,0.052,0.306],["C",-3.674,-0.482,0.216],["O",-4.054,-1.218,1.112],["O",-4.581,0.212,-0.515],["H",-1.107,1.279,-1.002],["H",-2.721,1.48,-1.209],["H",-2.145,-0.818,-1.218],["H",-1.553,-1.826,1.077],["H",-1.243,-0.209,1.664],["H",0.263,-2.969,-0.729],["H",2.628,-2.344,-1.263],["H",4.399,-0.189,-0.923],["H",4.506,2.09,0.069],["H",2.535,3.062,1.199],["H",0.418,1.783,1.361],["H",-5.434,-0.003,-0.084]],"bonds":[[0,1,1.0],[1,2,1.0],[2,3,1.0],[3,4,1.5],[4,5,1.5],[5,6,1.5],[6,7,1.5],[7,8,1.5],[8,9,1.5],[9,10,1.5],[10,11,1.5],[1,12,1.0],[12,13,2.0],[12,14,1.0],[11,3,1.5],[11,6,1.5],[0,15,1.0],[0,16,1.0],[1,17,1.0],[2,18,1.0],[2,19,1.0],[4,20,1.0],[5,21,1.0],[7,22,1.0],[8,23,1.0],[9,24,1.0],[10,25,1.0],[14,26,1.0]],"marks":[{"atoms":[0],"label":"\u03b1-Amino N","kind":"nterm","note":"N-terminal attachment point. Its lone pair attacks the previous residue's carboxyl carbon to form the peptide bond."},{"atoms":[12],"label":"Carboxyl C","kind":"cterm","note":"C-terminal attachment point. Becomes the carbonyl carbon of the peptide bond (C\u2013N)."},{"atoms":[14],"label":"Leaving OH","kind":"leave","note":"This hydroxyl plus one amine H leave as water during condensation. In cells the carboxyl is first activated as an aminoacyl-tRNA ester."},{"atoms":[1],"label":"C\u03b1","kind":"calpha","note":"Chiral centre, S configuration (L-form). Links the backbone to the side chain."},{"atoms":[5],"label":"Indole N\u03b51","kind":"site","note":"H-bond donor; anchors membrane proteins at the lipid interface. Indole fluorescence (~350 nm) is used to probe folding."}],"nH":[15,16],"chir":"S"},{"code3":"Ser","code1":"S","name":"Serine","cls":"polar","mw":105.09,"pka":null,"fact":"Small hydroxyl side chain. The nucleophile of the catalytic triad in trypsin and chymotrypsin, and the most frequently phosphorylated residue.","atoms":[["N",0.579,1.579,0.537],["C",-0.023,0.222,0.54],["C",-1.444,0.243,-0.043],["O",-2.132,-0.983,0.206],["C",0.839,-0.753,-0.27],["O",0.452,-1.77,-0.826],["O",2.148,-0.414,-0.305],["H",0.62,1.923,-0.423],["H",1.56,1.471,0.811],["H",-0.043,-0.155,1.568],["H",-2.034,1.037,0.426],["H",-1.439,0.421,-1.124],["H",-1.655,-1.685,-0.281],["H",2.571,-1.136,-0.817]],"bonds":[[0,1,1.0],[1,2,1.0],[2,3,1.0],[1,4,1.0],[4,5,2.0],[4,6,1.0],[0,7,1.0],[0,8,1.0],[1,9,1.0],[2,10,1.0],[2,11,1.0],[3,12,1.0],[6,13,1.0]],"marks":[{"atoms":[0],"label":"\u03b1-Amino N","kind":"nterm","note":"N-terminal attachment point. Its lone pair attacks the previous residue's carboxyl carbon to form the peptide bond."},{"atoms":[4],"label":"Carboxyl C","kind":"cterm","note":"C-terminal attachment point. Becomes the carbonyl carbon of the peptide bond (C\u2013N)."},{"atoms":[6],"label":"Leaving OH","kind":"leave","note":"This hydroxyl plus one amine H leave as water during condensation. In cells the carboxyl is first activated as an aminoacyl-tRNA ester."},{"atoms":[1],"label":"C\u03b1","kind":"calpha","note":"Chiral centre, S configuration (L-form). Links the backbone to the side chain."},{"atoms":[3],"label":"Hydroxyl O\u03b3","kind":"site","note":"Phosphorylation by Ser/Thr kinases; O-GlcNAcylation; catalytic nucleophile in serine proteases."}],"nH":[7,8],"chir":"S"},{"code3":"Thr","code1":"T","name":"Threonine","cls":"polar","mw":119.12,"pka":null,"fact":"\u03b2-branched hydroxyl residue with a second stereocentre. A major phosphorylation and O-glycosylation site.","atoms":[["N",-0.623,1.314,-1.146],["C",-0.086,0.804,0.139],["C",-0.885,-0.414,0.656],["O",-0.455,-0.784,1.97],["C",-0.845,-1.641,-0.25],["C",1.407,0.48,0.003],["O",2.022,-0.39,0.603],["O",2.062,1.326,-0.827],["H",-1.498,1.804,-0.967],["H",0.035,2.015,-1.497],["H",-0.139,1.608,0.884],["H",-1.933,-0.11,0.763],["H",0.465,-1.11,1.893],["H",0.167,-2.048,-0.34],["H",-1.459,-2.442,0.178],["H",-1.224,-1.418,-1.252],["H",2.988,1.005,-0.811]],"bonds":[[0,1,1.0],[1,2,1.0],[2,3,1.0],[2,4,1.0],[1,5,1.0],[5,6,2.0],[5,7,1.0],[0,8,1.0],[0,9,1.0],[1,10,1.0],[2,11,1.0],[3,12,1.0],[4,13,1.0],[4,14,1.0],[4,15,1.0],[7,16,1.0]],"marks":[{"atoms":[0],"label":"\u03b1-Amino N","kind":"nterm","note":"N-terminal attachment point. Its lone pair attacks the previous residue's carboxyl carbon to form the peptide bond."},{"atoms":[5],"label":"Carboxyl C","kind":"cterm","note":"C-terminal attachment point. Becomes the carbonyl carbon of the peptide bond (C\u2013N)."},{"atoms":[7],"label":"Leaving OH","kind":"leave","note":"This hydroxyl plus one amine H leave as water during condensation. In cells the carboxyl is first activated as an aminoacyl-tRNA ester."},{"atoms":[1],"label":"C\u03b1","kind":"calpha","note":"Chiral centre, S configuration (L-form). Links the backbone to the side chain."},{"atoms":[3],"label":"Hydroxyl O\u03b31","kind":"site","note":"Phosphorylation by Ser/Thr kinases; O-linked glycosylation."}],"nH":[8,9],"chir":"S"},{"code3":"Cys","code1":"C","name":"Cysteine","cls":"polar","mw":121.16,"pka":8.3,"fact":"Thiol side chain. Pairs of cysteines oxidise to disulfide bonds that staple extracellular proteins together.","atoms":[["N",0.226,1.674,0.218],["C",0.466,0.254,0.579],["C",-0.789,-0.508,1.032],["S",-2.241,-0.297,-0.06],["C",1.138,-0.505,-0.567],["O",1.837,-1.5,-0.452],["O",0.834,-0.027,-1.794],["H",-0.172,1.682,-0.727],["H",-0.509,2.05,0.817],["H",1.191,0.26,1.402],["H",-0.584,-1.581,1.111],["H",-1.089,-0.156,2.025],["H",-1.667,-0.761,-1.181],["H",1.36,-0.586,-2.404]],"bonds":[[0,1,1.0],[1,2,1.0],[2,3,1.0],[1,4,1.0],[4,5,2.0],[4,6,1.0],[0,7,1.0],[0,8,1.0],[1,9,1.0],[2,10,1.0],[2,11,1.0],[3,12,1.0],[6,13,1.0]],"marks":[{"atoms":[0],"label":"\u03b1-Amino N","kind":"nterm","note":"N-terminal attachment point. Its lone pair attacks the previous residue's carboxyl carbon to form the peptide bond."},{"atoms":[4],"label":"Carboxyl C","kind":"cterm","note":"C-terminal attachment point. Becomes the carbonyl carbon of the peptide bond (C\u2013N)."},{"atoms":[6],"label":"Leaving OH","kind":"leave","note":"This hydroxyl plus one amine H leave as water during condensation. In cells the carboxyl is first activated as an aminoacyl-tRNA ester."},{"atoms":[1],"label":"C\u03b1","kind":"calpha","note":"Chiral centre, R configuration (L-form). Links the backbone to the side chain."},{"atoms":[3],"label":"Thiol S\u03b3","kind":"site","note":"Forms disulfide bridges (S\u2013S); binds Zn/Fe; palmitoylation; active-site nucleophile in caspases."}],"nH":[7,8],"chir":"R"},{"code3":"Sec","code1":"U","name":"Selenocysteine","cls":"special","mw":168.05,"pka":5.2,"fact":"The 21st amino acid. Inserted at a recoded UGA stop codon using a SECIS element; selenium makes it a stronger nucleophile than cysteine.","atoms":[["N",-0.116,1.521,0.026],["C",0.263,0.236,0.503],["C",-0.881,-0.611,0.991],["Se",-2.225,-0.995,-0.31],["C",1.139,-0.514,-0.434],["O",1.549,-1.676,-0.128],["O",1.541,0.009,-1.658],["H",-0.842,1.571,-0.687],["H",-0.017,2.293,0.687],["H",0.899,0.411,1.409],["H",-0.437,-1.576,1.353],["H",-1.355,-0.169,1.89],["H",-2.014,-0.361,-1.67],["H",2.495,-0.14,-1.973]],"bonds":[[0,1,1.0],[1,2,1.0],[2,3,1.0],[1,4,1.0],[4,5,2.0],[4,6,1.0],[0,7,1.0],[0,8,1.0],[1,9,1.0],[2,10,1.0],[2,11,1.0],[3,12,1.0],[6,13,1.0]],"marks":[{"atoms":[0],"label":"\u03b1-Amino N","kind":"nterm","note":"N-terminal attachment point. Its lone pair attacks the previous residue's carboxyl carbon to form the peptide bond."},{"atoms":[4],"label":"Carboxyl C","kind":"cterm","note":"C-terminal attachment point. Becomes the carbonyl carbon of the peptide bond (C\u2013N)."},{"atoms":[6],"label":"Leaving OH","kind":"leave","note":"This hydroxyl plus one amine H leave as water during condensation. In cells the carboxyl is first activated as an aminoacyl-tRNA ester."},{"atoms":[1],"label":"C\u03b1","kind":"calpha","note":"Chiral centre, R configuration (L-form). Links the backbone to the side chain."},{"atoms":[3],"label":"Selenol Se","kind":"site","note":"Ionised at physiological pH; catalytic redox centre in glutathione peroxidase and thioredoxin reductase."}],"nH":[7,8],"chir":"R"},{"code3":"Asn","code1":"N","name":"Asparagine","cls":"polar","mw":132.12,"pka":null,"fact":"Carboxamide side chain. The attachment point for N-linked glycans in the endoplasmic reticulum.","atoms":[["N",-0.28,-1.472,0.714],["C",0.421,-0.415,-0.073],["C",-0.222,0.95,0.162],["C",-1.429,1.137,-0.723],["O",-1.513,2.012,-1.576],["N",-2.455,0.27,-0.486],["C",1.9,-0.372,0.313],["O",2.412,-0.946,1.262],["O",2.647,0.369,-0.526],["H",0.194,-2.361,0.526],["H",-0.072,-1.305,1.706],["H",0.366,-0.708,-1.128],["H",0.479,1.762,-0.067],["H",-0.52,1.089,1.209],["H",-3.233,0.292,-1.132],["H",-2.256,-0.606,-0.008],["H",3.56,0.303,-0.173]],"bonds":[[0,1,1.0],[1,2,1.0],[2,3,1.0],[3,4,2.0],[3,5,1.0],[1,6,1.0],[6,7,2.0],[6,8,1.0],[0,9,1.0],[0,10,1.0],[1,11,1.0],[2,12,1.0],[2,13,1.0],[5,14,1.0],[5,15,1.0],[8,16,1.0]],"marks":[{"atoms":[0],"label":"\u03b1-Amino N","kind":"nterm","note":"N-terminal attachment point. Its lone pair attacks the previous residue's carboxyl carbon to form the peptide bond."},{"atoms":[6],"label":"Carboxyl C","kind":"cterm","note":"C-terminal attachment point. Becomes the carbonyl carbon of the peptide bond (C\u2013N)."},{"atoms":[8],"label":"Leaving OH","kind":"leave","note":"This hydroxyl plus one amine H leave as water during condensation. In cells the carboxyl is first activated as an aminoacyl-tRNA ester."},{"atoms":[1],"label":"C\u03b1","kind":"calpha","note":"Chiral centre, S configuration (L-form). Links the backbone to the side chain."},{"atoms":[5],"label":"Amide N\u03b42","kind":"site","note":"N-linked glycosylation site within the motif N-X-S/T; slow deamidation to aspartate ages proteins."}],"nH":[9,10],"chir":"S"},{"code3":"Gln","code1":"Q","name":"Glutamine","cls":"polar","mw":146.15,"pka":null,"fact":"Carboxamide one carbon longer than asparagine. Key nitrogen carrier in metabolism and a cross-linking site in blood clotting.","atoms":[["N",-1.806,-1.17,-0.975],["C",-1.574,-0.418,0.281],["C",-0.132,-0.579,0.774],["C",0.937,-0.134,-0.228],["C",2.33,-0.233,0.354],["O",2.587,-0.528,1.514],["N",3.326,0.068,-0.529],["C",-1.94,1.058,0.089],["O",-2.165,1.611,-0.978],["O",-2.006,1.745,1.245],["H",-1.395,-0.636,-1.745],["H",-2.808,-1.148,-1.175],["H",-2.259,-0.826,1.033],["H",0.043,-1.632,1.034],["H",-0.007,-0.014,1.707],["H",0.773,0.908,-0.525],["H",0.901,-0.759,-1.127],["H",4.275,-0.064,-0.203],["H",3.167,0.092,-1.526],["H",-2.249,2.656,0.979]],"bonds":[[0,1,1.0],[1,2,1.0],[2,3,1.0],[3,4,1.0],[4,5,2.0],[4,6,1.0],[1,7,1.0],[7,8,2.0],[7,9,1.0],[0,10,1.0],[0,11,1.0],[1,12,1.0],[2,13,1.0],[2,14,1.0],[3,15,1.0],[3,16,1.0],[6,17,1.0],[6,18,1.0],[9,19,1.0]],"marks":[{"atoms":[0],"label":"\u03b1-Amino N","kind":"nterm","note":"N-terminal attachment point. Its lone pair attacks the previous residue's carboxyl carbon to form the peptide bond."},{"atoms":[7],"label":"Carboxyl C","kind":"cterm","note":"C-terminal attachment point. Becomes the carbonyl carbon of the peptide bond (C\u2013N)."},{"atoms":[9],"label":"Leaving OH","kind":"leave","note":"This hydroxyl plus one amine H leave as water during condensation. In cells the carboxyl is first activated as an aminoacyl-tRNA ester."},{"atoms":[1],"label":"C\u03b1","kind":"calpha","note":"Chiral centre, S configuration (L-form). Links the backbone to the side chain."},{"atoms":[6],"label":"Amide N\u03b52","kind":"site","note":"Transglutaminase cross-links Gln to Lys (isopeptide bonds); deamidation to Glu."}],"nH":[10,11],"chir":"S"},{"code3":"Asp","code1":"D","name":"Aspartic acid","cls":"acidic","mw":133.1,"pka":3.9,"fact":"Carboxylate side chain, negatively charged at physiological pH. Common in metal-binding and catalytic sites.","atoms":[["N",-1.149,-1.326,1.344],["C",-0.426,-0.223,0.665],["C",0.689,-0.761,-0.222],["C",1.53,0.365,-0.747],["O",1.525,0.794,-1.888],["O",2.34,0.894,0.188],["C",-1.416,0.564,-0.199],["O",-2.349,0.099,-0.837],["O",-1.138,1.882,-0.247],["H",-1.708,-1.829,0.65],["H",-0.486,-1.996,1.73],["H",-0.038,0.442,1.445],["H",0.291,-1.317,-1.08],["H",1.346,-1.449,0.323],["H",2.813,1.615,-0.279],["H",-1.824,2.246,-0.846]],"bonds":[[0,1,1.0],[1,2,1.0],[2,3,1.0],[3,4,2.0],[3,5,1.0],[1,6,1.0],[6,7,2.0],[6,8,1.0],[0,9,1.0],[0,10,1.0],[1,11,1.0],[2,12,1.0],[2,13,1.0],[5,14,1.0],[8,15,1.0]],"marks":[{"atoms":[0],"label":"\u03b1-Amino N","kind":"nterm","note":"N-terminal attachment point. Its lone pair attacks the previous residue's carboxyl carbon to form the peptide bond."},{"atoms":[6],"label":"Carboxyl C","kind":"cterm","note":"C-terminal attachment point. Becomes the carbonyl carbon of the peptide bond (C\u2013N)."},{"atoms":[8],"label":"Leaving OH","kind":"leave","note":"This hydroxyl plus one amine H leave as water during condensation. In cells the carboxyl is first activated as an aminoacyl-tRNA ester."},{"atoms":[1],"label":"C\u03b1","kind":"calpha","note":"Chiral centre, S configuration (L-form). Links the backbone to the side chain."},{"atoms":[5,4],"label":"Carboxylate O\u03b4","kind":"site","note":"Negatively charged at pH 7. Coordinates Ca\u00b2\u207a/Mg\u00b2\u207a; catalytic acid/base in aspartyl proteases (e.g. HIV protease)."}],"nH":[9,10],"chir":"S"},{"code3":"Glu","code1":"E","name":"Glutamic acid","cls":"acidic","mw":147.13,"pka":4.1,"fact":"One carbon longer than aspartate. Glutamate is also the main excitatory neurotransmitter.","atoms":[["N",-1.561,1.491,-1.386],["C",-1.181,0.37,-0.493],["C",0.341,0.203,-0.545],["C",0.825,-1.076,0.133],["C",2.28,-1.319,-0.15],["O",2.745,-2.251,-0.783],["O",3.081,-0.387,0.398],["C",-1.669,0.672,0.93],["O",-1.953,1.771,1.38],["O",-1.786,-0.43,1.696],["H",-1.184,2.355,-0.988],["H",-2.574,1.615,-1.337],["H",-1.692,-0.528,-0.857],["H",0.671,0.188,-1.593],["H",0.832,1.069,-0.08],["H",0.692,-1.042,1.219],["H",0.264,-1.942,-0.238],["H",3.984,-0.669,0.141],["H",-2.117,-0.09,2.555]],"bonds":[[0,1,1.0],[1,2,1.0],[2,3,1.0],[3,4,1.0],[4,5,2.0],[4,6,1.0],[1,7,1.0],[7,8,2.0],[7,9,1.0],[0,10,1.0],[0,11,1.0],[1,12,1.0],[2,13,1.0],[2,14,1.0],[3,15,1.0],[3,16,1.0],[6,17,1.0],[9,18,1.0]],"marks":[{"atoms":[0],"label":"\u03b1-Amino N","kind":"nterm","note":"N-terminal attachment point. Its lone pair attacks the previous residue's carboxyl carbon to form the peptide bond."},{"atoms":[7],"label":"Carboxyl C","kind":"cterm","note":"C-terminal attachment point. Becomes the carbonyl carbon of the peptide bond (C\u2013N)."},{"atoms":[9],"label":"Leaving OH","kind":"leave","note":"This hydroxyl plus one amine H leave as water during condensation. In cells the carboxyl is first activated as an aminoacyl-tRNA ester."},{"atoms":[1],"label":"C\u03b1","kind":"calpha","note":"Chiral centre, S configuration (L-form). Links the backbone to the side chain."},{"atoms":[6,5],"label":"Carboxylate O\u03b5","kind":"site","note":"Negatively charged at pH 7. \u03b3-Carboxylated in clotting factors (vitamin K); metal binding."}],"nH":[10,11],"chir":"S"},{"code3":"Lys","code1":"K","name":"Lysine","cls":"basic","mw":146.19,"pka":10.5,"fact":"Long flexible chain ending in a primary amine. The hub of post-translational modification, especially on histones.","atoms":[["N",-2.774,-0.779,-1.658],["C",-2.021,-0.392,-0.443],["C",-0.547,-0.196,-0.821],["C",0.378,-0.178,0.402],["C",1.84,0.007,-0.012],["C",2.764,0.016,1.206],["N",4.156,0.192,0.808],["C",-2.65,0.88,0.154],["O",-2.079,1.858,0.605],["O",-4.004,0.811,0.195],["H",-3.768,-0.782,-1.417],["H",-2.535,-1.736,-1.91],["H",-2.123,-1.188,0.304],["H",-0.423,0.736,-1.389],["H",-0.223,-1.015,-1.477],["H",0.271,-1.12,0.953],["H",0.094,0.628,1.087],["H",1.946,0.95,-0.565],["H",2.132,-0.802,-0.693],["H",2.484,0.825,1.89],["H",2.67,-0.925,1.759],["H",4.419,-0.54,0.149],["H",4.255,1.072,0.301],["H",-4.263,1.678,0.571]],"bonds":[[0,1,1.0],[1,2,1.0],[2,3,1.0],[3,4,1.0],[4,5,1.0],[5,6,1.0],[1,7,1.0],[7,8,2.0],[7,9,1.0],[0,10,1.0],[0,11,1.0],[1,12,1.0],[2,13,1.0],[2,14,1.0],[3,15,1.0],[3,16,1.0],[4,17,1.0],[4,18,1.0],[5,19,1.0],[5,20,1.0],[6,21,1.0],[6,22,1.0],[9,23,1.0]],"marks":[{"atoms":[0],"label":"\u03b1-Amino N","kind":"nterm","note":"N-terminal attachment point. Its lone pair attacks the previous residue's carboxyl carbon to form the peptide bond."},{"atoms":[7],"label":"Carboxyl C","kind":"cterm","note":"C-terminal attachment point. Becomes the carbonyl carbon of the peptide bond (C\u2013N)."},{"atoms":[9],"label":"Leaving OH","kind":"leave","note":"This hydroxyl plus one amine H leave as water during condensation. In cells the carboxyl is first activated as an aminoacyl-tRNA ester."},{"atoms":[1],"label":"C\u03b1","kind":"calpha","note":"Chiral centre, S configuration (L-form). Links the backbone to the side chain."},{"atoms":[6],"label":"\u03b5-Amino N\u03b6","kind":"site","note":"Positively charged. Ubiquitination, SUMOylation, acetylation and methylation (histone code)."}],"nH":[10,11],"chir":"S"},{"code3":"Arg","code1":"R","name":"Arginine","cls":"basic","mw":174.2,"pka":12.5,"fact":"Guanidinium group stays protonated across almost all biological pH. Forms salt bridges and grips phosphate groups.","atoms":[["N",-2.907,-0.029,1.416],["C",-2.756,0.109,-0.049],["C",-1.414,0.765,-0.399],["C",-0.184,0.012,0.124],["C",1.107,0.731,-0.266],["N",2.254,-0.013,0.236],["C",3.512,0.399,-0.04],["N",3.82,1.352,-0.838],["N",4.423,-0.337,0.626],["C",-2.945,-1.244,-0.75],["O",-2.426,-1.613,-1.792],["O",-3.852,-2.036,-0.131],["H",-3.734,-0.608,1.587],["H",-3.103,0.885,1.82],["H",-3.568,0.748,-0.417],["H",-1.336,0.861,-1.489],["H",-1.403,1.786,0.004],["H",-0.229,-0.077,1.216],["H",-0.166,-1.01,-0.275],["H",1.112,1.743,0.155],["H",1.166,0.814,-1.358],["H",2.145,-0.297,1.203],["H",4.832,1.474,-0.856],["H",5.365,-0.258,0.266],["H",4.148,-1.311,0.691],["H",-3.861,-2.847,-0.682]],"bonds":[[0,1,1.0],[1,2,1.0],[2,3,1.0],[3,4,1.0],[4,5,1.0],[5,6,1.0],[6,7,2.0],[6,8,1.0],[1,9,1.0],[9,10,2.0],[9,11,1.0],[0,12,1.0],[0,13,1.0],[1,14,1.0],[2,15,1.0],[2,16,1.0],[3,17,1.0],[3,18,1.0],[4,19,1.0],[4,20,1.0],[5,21,1.0],[7,22,1.0],[8,23,1.0],[8,24,1.0],[11,25,1.0]],"marks":[{"atoms":[0],"label":"\u03b1-Amino N","kind":"nterm","note":"N-terminal attachment point. Its lone pair attacks the previous residue's carboxyl carbon to form the peptide bond."},{"atoms":[9],"label":"Carboxyl C","kind":"cterm","note":"C-terminal attachment point. Becomes the carbonyl carbon of the peptide bond (C\u2013N)."},{"atoms":[11],"label":"Leaving OH","kind":"leave","note":"This hydroxyl plus one amine H leave as water during condensation. In cells the carboxyl is first activated as an aminoacyl-tRNA ester."},{"atoms":[1],"label":"C\u03b1","kind":"calpha","note":"Chiral centre, S configuration (L-form). Links the backbone to the side chain."},{"atoms":[8,7,5],"label":"Guanidinium N\u03b7/N\u03b5","kind":"site","note":"Planar, permanently charged. Binds phosphate and DNA backbones; methylated by PRMTs; citrullinated by PADs."}],"nH":[12,13],"chir":"S"},{"code3":"His","code1":"H","name":"Histidine","cls":"basic","mw":155.16,"pka":6.0,"fact":"The only side chain that titrates near physiological pH, which makes it the general acid/base of countless enzymes.","atoms":[["N",-2.314,-0.311,1.641],["C",-1.053,0.093,0.959],["C",-0.699,-0.904,-0.151],["C",0.712,-0.763,-0.613],["C",1.189,-0.404,-1.855],["N",2.55,-0.422,-1.739],["C",2.847,-0.789,-0.458],["N",1.76,-1.002,0.247],["C",-1.223,1.512,0.4],["O",-1.008,1.916,-0.731],["O",-1.666,2.378,1.348],["H",-2.54,0.427,2.312],["H",-2.124,-1.146,2.194],["H",-0.254,0.136,1.709],["H",-0.818,-1.93,0.22],["H",-1.384,-0.796,-1.001],["H",0.689,-0.133,-2.775],["H",3.218,-0.2,-2.463],["H",3.864,-0.883,-0.101],["H",-1.746,3.222,0.857]],"bonds":[[0,1,1.0],[1,2,1.0],[2,3,1.0],[3,4,1.5],[4,5,1.5],[5,6,1.5],[6,7,1.5],[1,8,1.0],[8,9,2.0],[8,10,1.0],[7,3,1.5],[0,11,1.0],[0,12,1.0],[1,13,1.0],[2,14,1.0],[2,15,1.0],[4,16,1.0],[5,17,1.0],[6,18,1.0],[10,19,1.0]],"marks":[{"atoms":[0],"label":"\u03b1-Amino N","kind":"nterm","note":"N-terminal attachment point. Its lone pair attacks the previous residue's carboxyl carbon to form the peptide bond."},{"atoms":[8],"label":"Carboxyl C","kind":"cterm","note":"C-terminal attachment point. Becomes the carbonyl carbon of the peptide bond (C\u2013N)."},{"atoms":[10],"label":"Leaving OH","kind":"leave","note":"This hydroxyl plus one amine H leave as water during condensation. In cells the carboxyl is first activated as an aminoacyl-tRNA ester."},{"atoms":[1],"label":"C\u03b1","kind":"calpha","note":"Chiral centre, S configuration (L-form). Links the backbone to the side chain."},{"atoms":[5,7],"label":"Imidazole N\u03b52/N\u03b41","kind":"site","note":"pKa near 6, so it shuttles protons; base in the catalytic triad; coordinates Zn\u00b2\u207a, Fe and Cu."}],"nH":[11,12],"chir":"S"},{"code3":"Pro","code1":"P","name":"Proline","cls":"special","mw":115.13,"pka":null,"fact":"Its side chain loops back onto the backbone nitrogen, forming a rigid ring. Breaks helices and isomerises between cis and trans.","atoms":[["N",-0.285,0.417,1.2],["C",-1.64,0.496,0.673],["C",-1.416,0.62,-0.824],["C",-0.08,-0.069,-1.087],["C",0.429,-0.496,0.285],["C",1.941,-0.389,0.461],["O",2.546,-0.059,1.47],["O",2.632,-0.807,-0.622],["H",-0.26,0.06,2.154],["H",-2.186,1.351,1.079],["H",-2.198,-0.418,0.908],["H",-2.231,0.163,-1.395],["H",-1.351,1.675,-1.118],["H",0.603,0.624,-1.593],["H",-0.212,-0.938,-1.741],["H",0.14,-1.533,0.497],["H",3.567,-0.698,-0.347]],"bonds":[[0,1,1.0],[1,2,1.0],[2,3,1.0],[3,4,1.0],[4,5,1.0],[5,6,2.0],[5,7,1.0],[4,0,1.0],[0,8,1.0],[1,9,1.0],[1,10,1.0],[2,11,1.0],[2,12,1.0],[3,13,1.0],[3,14,1.0],[4,15,1.0],[7,16,1.0]],"marks":[{"atoms":[0],"label":"\u03b1-Amino N","kind":"nterm","note":"N-terminal attachment point. Its lone pair attacks the previous residue's carboxyl carbon to form the peptide bond. A secondary amine here, so proline has no amide H to donate in helices."},{"atoms":[5],"label":"Carboxyl C","kind":"cterm","note":"C-terminal attachment point. Becomes the carbonyl carbon of the peptide bond (C\u2013N)."},{"atoms":[7],"label":"Leaving OH","kind":"leave","note":"This hydroxyl plus one amine H leave as water during condensation. In cells the carboxyl is first activated as an aminoacyl-tRNA ester."},{"atoms":[4],"label":"C\u03b1","kind":"calpha","note":"Chiral centre, S configuration (L-form). Links the backbone to the side chain."},{"atoms":[2],"label":"Ring C\u03b3","kind":"site","note":"Hydroxylated by prolyl 4-hydroxylase (needs vitamin C) to stabilise the collagen triple helix."}],"nH":[8],"chir":"S"}];
+const CLASSES = [["all","All"],["nonpolar","Nonpolar"],["aromatic","Aromatic"],["polar","Polar"],["acidic","Acidic"],["basic","Basic"],["special","Special"]];
+const KIND_NAME = {nterm:"N-terminus",cterm:"C-terminus",leave:"Leaving group",calpha:"Alpha carbon",site:"Side chain",hydro:"Hydrophobic"};
+const RAD = {C:.36,N:.34,O:.33,S:.48,Se:.54,H:.2};
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---------- theme tokens for canvas ---------- */
+let T = {};
+function readTokens(){
+  const cs = getComputedStyle(document.documentElement);
+  const g = n => cs.getPropertyValue(n).trim();
+  T = {fg:g("--fg"),muted:g("--muted"),canvas:g("--canvas"),labelBg:g("--label-bg"),line:g("--line"),
+    k:{nterm:g("--k-nterm"),cterm:g("--k-cterm"),leave:g("--k-leave"),calpha:g("--k-calpha"),site:g("--k-site"),hydro:g("--k-hydro")},
+    a:{C:g("--a-C"),N:g("--a-N"),O:g("--a-O"),S:g("--a-S"),Se:g("--a-Se"),H:g("--a-H")},hs:g("--a-Hstroke"),
+    font:g("--f-body"),mono:g("--f-mono")};
+}
+readTokens();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change",readTokens);
+new MutationObserver(readTokens).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+
+/* ---------- math ---------- */
+const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
+const dot3=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const norm=a=>{const l=Math.hypot(...a)||1;return[a[0]/l,a[1]/l,a[2]/l]};
+const mul=(A,B)=>A.map(r=>[0,1,2].map(j=>r[0]*B[0][j]+r[1]*B[1][j]+r[2]*B[2][j]));
+const rotY=t=>[[Math.cos(t),0,Math.sin(t)],[0,1,0],[-Math.sin(t),0,Math.cos(t)]];
+const rotX=t=>[[1,0,0],[0,Math.cos(t),-Math.sin(t)],[0,Math.sin(t),Math.cos(t)]];
+
+/* prep each molecule: canonical orientation (N→C along x, side chain up) */
+DATA.forEach(m=>{
+  const P = m.atoms.map(a=>[a[1],a[2],a[3]]);
+  const get = k => m.marks.find(x=>x.kind===k).atoms[0];
+  const iN=get("nterm"), iC=get("cterm"), iA=get("calpha"), iL=get("leave");
+  const bb = new Set([iN,iC,iA,iL]);
+  m.bonds.forEach(([i,j])=>{ if(i===iC&&m.atoms[j][0]==="O") bb.add(j); if(j===iC&&m.atoms[i][0]==="O") bb.add(i); });
+  m.bonds.forEach(([i,j])=>{ if(m.atoms[j][0]==="H"&&(i===iN||i===iL)) bb.add(j); if(m.atoms[i][0]==="H"&&(j===iN||j===iL)) bb.add(i); });
+  let sc = m.atoms.map((a,i)=>i).filter(i=>!bb.has(i)&&m.atoms[i][0]!=="H");
+  if(m.code3==="Pro") sc = sc.filter(i=>i!==iN);
+  if(!sc.length) sc = m.atoms.map((a,i)=>i).filter(i=>!bb.has(i));
+  const cen = [0,1,2].map(k=>sc.reduce((s,i)=>s+P[i][k],0)/sc.length);
+  const u = norm(sub(P[iC],P[iN]));
+  let v = sub(cen,P[iA]); v = norm(sub(v,u.map(x=>x*dot3(v,u))));
+  const w = cross(u,v);
+  m.R0 = [u,v,w];
+  // recentre on backbone+sidechain bounding sphere
+  const c = [0,1,2].map(k=>P.reduce((s,p)=>s+p[k],0)/P.length);
+  m.P = P.map(p=>sub(p,c));
+  m.rad = Math.max(...m.P.map(p=>Math.hypot(...p)))+.45;
+  m.heavy = m.atoms.map(a=>a[0]!=="H");
+  m.formula = (()=>{const n={};m.atoms.forEach(a=>n[a[0]]=(n[a[0]]||0)+1);const ord=["C","H","N","O","S","Se"];return ord.filter(e=>n[e]).map(e=>e+(n[e]>1?String(n[e]).replace(/\d/g,d=>"₀₁₂₃₄₅₆₇₈₉"[d]):"")).join("")})();
+});
+
+/* ---------- viewer ---------- */
+class Viewer{
+  constructor(canvas,opts){
+    this.c=canvas; this.ctx=canvas.getContext("2d"); this.o=opts; this.visible=true;
+    this.zoom=1; this.spin=!reduce; this.showH=opts.h; this.labels=opts.labels; this.focus=-1; this.dirty=true;
+    new ResizeObserver(()=>this.resize()).observe(canvas); this.resize();
+    if(opts.interactive) this.bindInput();
+  }
+  set(m){ this.m=m; this.R=m.R0.map(r=>r.slice()); if(this.o.interactive){this.R=mul(rotX(-.35),mul(rotY(.25),this.R));} else {this.R=mul(rotX(-.3),this.R);} this.zoom=1; this.focus=-1; this.dirty=true; }
+  resize(){ const d=Math.min(devicePixelRatio||1,2), r=this.c.getBoundingClientRect(); if(!r.width) return; this.w=r.width; this.h=r.height; this.c.width=Math.round(r.width*d); this.c.height=Math.round(r.height*d); this.ctx.setTransform(d,0,0,d,0,0); this.dirty=true; }
+  bindInput(){
+    let drag=null; const pts=new Map(); let pinch=0;
+    this.c.addEventListener("pointerdown",e=>{this.c.setPointerCapture(e.pointerId);pts.set(e.pointerId,[e.clientX,e.clientY]);drag=[e.clientX,e.clientY];this.held=true;});
+    this.c.addEventListener("pointermove",e=>{
+      if(!pts.has(e.pointerId)) return; pts.set(e.pointerId,[e.clientX,e.clientY]);
+      if(pts.size===2){const [a,b]=[...pts.values()];const d=Math.hypot(a[0]-b[0],a[1]-b[1]);if(pinch)this.zoom=Math.min(3,Math.max(.5,this.zoom*d/pinch));pinch=d;this.dirty=true;return;}
+      if(!drag) return; const dx=e.clientX-drag[0], dy=e.clientY-drag[1]; drag=[e.clientX,e.clientY];
+      this.R=mul(rotX(dy*.01),mul(rotY(dx*.01),this.R)); this.dirty=true;
+    });
+    const up=e=>{pts.delete(e.pointerId);if(pts.size<2)pinch=0;if(!pts.size){drag=null;this.held=false;}};
+    this.c.addEventListener("pointerup",up); this.c.addEventListener("pointercancel",up);
+    this.c.addEventListener("wheel",e=>{e.preventDefault();this.zoom=Math.min(3,Math.max(.5,this.zoom*Math.exp(-e.deltaY*.0015)));this.dirty=true;},{passive:false});
+  }
+  tick(dt,t){
+    if(!this.m||!this.visible) return;
+    if(this.spin&&!this.held){ this.R=mul(rotY(dt*(this.o.interactive?.35:.6)),this.R); this.dirty=true; }
+    if(this.dirty||this.o.interactive){ this.draw(t); this.dirty=false; }
+  }
+  draw(t){
+    const {ctx,w,h,m}=this; if(!w) return;
+    ctx.clearRect(0,0,w,h);
+    const pad=this.o.interactive?(this.labels?64:24):8;
+    const s=Math.min(w-pad*2,h-pad*2-(this.o.interactive?40:0))/(2*m.rad)*this.zoom*(this.o.interactive?1.3:1.15);
+    const cx=w/2, cy=h/2-(this.o.interactive?14:0), D=9;
+    const show=i=>this.showH||m.heavy[i];
+    const pr=m.P.map(p=>{const x=dot3(this.R[0],p),y=dot3(this.R[1],p),z=dot3(this.R[2],p);const f=D/(D-z);return[cx+x*s*f,cy-y*s*f,z,f];});
+    const items=[];
+    m.bonds.forEach(([i,j,o])=>{ if(!show(i)||!show(j)) return; items.push({z:(pr[i][2]+pr[j][2])/2-.05,b:[i,j,o]}); });
+    m.atoms.forEach((a,i)=>{ if(show(i)) items.push({z:pr[i][2],a:i}); });
+    items.sort((p,q)=>p.z-q.z);
+    const zr=m.rad;
+    const shade=z=>.55+.45*((z+zr)/(2*zr));
+    const bw=Math.max(1.6,.13*s);
+    for(const it of items){
+      if(it.b){
+        const [i,j,o]=it.b, A=pr[i], B=pr[j];
+        const mx=(A[0]+B[0])/2,my=(A[1]+B[1])/2;
+        const dx=B[0]-A[0],dy=B[1]-A[1],L=Math.hypot(dx,dy)||1,nx=-dy/L,ny=dx/L;
+        const offs=o===2?[-1,1]:o===1.5?[-.85,.85]:[0];
+        const al=shade(it.z);
+        offs.forEach((k,idx)=>{
+          const off=k*bw*.95, wdt=o>1?bw*.62:bw;
+          ctx.globalAlpha=al; ctx.lineWidth=wdt; ctx.lineCap="round";
+          if(o===1.5&&idx===1) ctx.setLineDash([wdt*1.2,wdt*1.6]); else ctx.setLineDash([]);
+          ctx.strokeStyle=T.a[m.atoms[i][0]]||T.a.C; ctx.beginPath(); ctx.moveTo(A[0]+nx*off,A[1]+ny*off); ctx.lineTo(mx+nx*off,my+ny*off); ctx.stroke();
+          ctx.strokeStyle=T.a[m.atoms[j][0]]||T.a.C; ctx.beginPath(); ctx.moveTo(mx+nx*off,my+ny*off); ctx.lineTo(B[0]+nx*off,B[1]+ny*off); ctx.stroke();
+        });
+        ctx.setLineDash([]); ctx.globalAlpha=1;
+      } else {
+        const i=it.a, el=m.atoms[i][0], p=pr[i], r=RAD[el]*s*p[3];
+        const col=T.a[el]||T.a.C;
+        const g=ctx.createRadialGradient(p[0]-r*.35,p[1]-r*.4,r*.1,p[0],p[1],r);
+        g.addColorStop(0,"rgba(255,255,255,.85)"); g.addColorStop(.35,col); g.addColorStop(1,col);
+        ctx.globalAlpha=shade(p[2]); ctx.fillStyle=g; ctx.beginPath(); ctx.arc(p[0],p[1],r,0,7); ctx.fill();
+        ctx.fillStyle="rgba(0,0,0,.18)"; ctx.beginPath(); ctx.arc(p[0],p[1],r,.2,Math.PI-.2); ctx.arc(p[0],p[1]-r*.15,r*.92,Math.PI-.2,.2,true); ctx.fill();
+        if(el==="H"){ctx.lineWidth=1;ctx.strokeStyle=T.hs;ctx.beginPath();ctx.arc(p[0],p[1],r,0,7);ctx.stroke();}
+        ctx.globalAlpha=1;
+      }
+    }
+    /* attachment rings */
+    const pulse=reduce?0:Math.sin(t*.004)*.5+.5;
+    m.marks.forEach((mk,k)=>{
+      const col=T.k[mk.kind], hot=k===this.focus;
+      let atoms=mk.atoms.slice(); if(mk.kind==="leave"&&this.showH) atoms=atoms.concat(m.nH);
+      atoms.forEach((i,ai)=>{
+        if(!show(i)) return;
+        const p=pr[i], r=RAD[m.atoms[i][0]]*s*p[3];
+        const rr=r+(this.o.interactive?5+pulse*3:3)+(hot?4:0);
+        ctx.strokeStyle=col; ctx.lineWidth=hot?3:this.o.interactive?2.2:1.6;
+        ctx.globalAlpha=(this.focus>=0&&!hot)?.35:1;
+        if(mk.kind==="leave"||(mk.kind==="leave"&&ai>0)) ctx.setLineDash([3,3]);
+        ctx.beginPath(); ctx.arc(p[0],p[1],rr,0,7); ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha=1;
+      });
+    });
+    if(this.o.interactive&&this.labels) this.drawLabels(pr,s,cx,cy);
+  }
+  drawLabels(pr,s,cx,cy){
+    const {ctx,m,w,h}=this; ctx.font=`600 12px ${T.font}`;
+    const L=m.marks.map((mk,k)=>{
+      const ax=mk.atoms.reduce((a,i)=>a+pr[i][0],0)/mk.atoms.length, ay=mk.atoms.reduce((a,i)=>a+pr[i][1],0)/mk.atoms.length;
+      let dx=ax-cx,dy=ay-cy; const d=Math.hypot(dx,dy); if(d<8){dx=0;dy=-1;}else{dx/=d;dy/=d;}
+      if(mk.kind==="calpha"){dx=dx*.4;dy=Math.abs(dy)<.3?.9:dy;const n=Math.hypot(dx,dy);dx/=n;dy/=n;}
+      const tw=ctx.measureText(mk.label).width+16;
+      return {k,mk,ax,ay,x:ax+dx*46-tw/2+dx*tw/2,y:ay+dy*40,w:tw,h:22};
+    });
+    for(let it=0;it<30;it++){
+      for(let a=0;a<L.length;a++)for(let b=a+1;b<L.length;b++){
+        const A=L[a],B=L[b]; const ox=Math.min(A.x+A.w,B.x+B.w)-Math.max(A.x,B.x), oy=Math.min(A.y+A.h/2,B.y+B.h/2)-Math.max(A.y-A.h/2,B.y-B.h/2);
+        if(ox>-4&&oy>-3){const push=(oy+3)/2*(A.y<B.y?-1:1); A.y+=push; B.y-=push;}
+      }
+      L.forEach(l=>{l.x=Math.max(6,Math.min(w-l.w-6,l.x)); l.y=Math.max(14,Math.min(h-58,l.y));});
+    }
+    L.forEach(l=>{
+      const col=T.k[l.mk.kind], hot=l.k===this.focus, dim=this.focus>=0&&!hot;
+      ctx.globalAlpha=dim?.4:1;
+      const ex=Math.max(l.x,Math.min(l.x+l.w,l.ax)), ey=l.y;
+      ctx.strokeStyle=col; ctx.lineWidth=1.2; ctx.beginPath(); ctx.moveTo(l.ax,l.ay); ctx.lineTo(ex,ey); ctx.stroke();
+      ctx.fillStyle=T.labelBg; ctx.beginPath(); ctx.roundRect(l.x,l.y-l.h/2,l.w,l.h,6); ctx.fill();
+      ctx.lineWidth=hot?2:1.2; ctx.stroke();
+      ctx.fillStyle=T.fg; ctx.textBaseline="middle"; ctx.fillText(l.mk.label,l.x+8,l.y+.5);
+      ctx.globalAlpha=1;
+    });
+  }
+}
+
+/* ---------- build UI ---------- */
+const main=new Viewer(document.getElementById("main"),{interactive:true,h:true,labels:true});
+const viewers=[main];
+const grid=document.getElementById("grid");
+const cards=DATA.map((m,idx)=>{
+  const b=document.createElement("button");
+  b.className=`card cls-${m.cls}`; b.dataset.cls=m.cls; b.setAttribute("aria-label",`${m.name} (${m.code3}, ${m.code1})`);
+  b.innerHTML=`<canvas aria-hidden="true"></canvas><span class="tag">${m.cls}</span><span class="meta"><span class="l1">${m.code1}</span><span class="nm">${m.name}<span>${m.code3} · ${m.mw.toFixed(2)} Da</span></span></span>`;
+  grid.appendChild(b);
+  const v=new Viewer(b.querySelector("canvas"),{interactive:false,h:false,labels:false}); v.set(m);
+  v.R=mul(rotY(idx*.7),v.R); viewers.push(v); b._v=v;
+  b.addEventListener("click",()=>{select(idx);document.querySelector(".bench").scrollIntoView({behavior:reduce?"auto":"smooth",block:"start"});});
+  return b;
+});
+const io=new IntersectionObserver(es=>es.forEach(e=>{e.target._v.visible=e.isIntersecting;}),{rootMargin:"100px"});
+cards.forEach(c=>io.observe(c));
+
+const chips=document.getElementById("chips");
+CLASSES.forEach(([k,lab],i)=>{
+  const c=document.createElement("button"); c.className="chip"+(k!=="all"?` cls-${k}`:""); c.setAttribute("aria-pressed",i===0?"true":"false");
+  c.innerHTML=(k!=="all"?`<i style="background:var(--cc)"></i>`:"")+`${lab} <span style="opacity:.6;font-family:var(--f-mono);font-size:11px">${k==="all"?DATA.length:DATA.filter(d=>d.cls===k).length}</span>`;
+  c.onclick=()=>{chips.querySelectorAll(".chip").forEach(x=>x.setAttribute("aria-pressed","false"));c.setAttribute("aria-pressed","true");cards.forEach(cd=>cd.hidden=!(k==="all"||cd.dataset.cls===k));};
+  chips.appendChild(c);
+});
+
+const info=document.getElementById("info");
+function select(idx){
+  const m=DATA[idx]; main.set(m);
+  cards.forEach((c,i)=>c.classList.toggle("sel",i===idx));
+  const chir = m.code3==="Gly"?"achiral":`${m.chir} (L)`;
+  info.innerHTML=`
+    <div class="idrow"><span class="big1">${m.code1}</span><div><h2>${m.name}</h2><div class="sub">${m.code3} · ${m.cls}${m.code3==="Sec"?" · UGA recoded":""}</div></div></div>
+    <dl class="facts">
+      <div><dt>Mass</dt><dd>${m.mw.toFixed(2)} Da</dd></div>
+      <div><dt>Formula</dt><dd>${m.formula}</dd></div>
+      <div><dt>Side-chain pKa</dt><dd>${m.pka?"≈ "+m.pka.toFixed(1):"—"}</dd></div>
+      <div><dt>Cα config</dt><dd>${chir}</dd></div>
+    </dl>
+    <p class="blurb">${m.fact}</p>
+    <p class="marks-h">Attachment &amp; reactive points</p>
+    <ul class="marks">${m.marks.map((mk,k)=>`<li><button class="mark" data-k="${k}" style="--c:var(--k-${mk.kind})"><i class="dot${mk.kind==="leave"?" dash":""}" style="--c:var(--k-${mk.kind})"></i><b>${mk.label}<em>${KIND_NAME[mk.kind]}</em></b><p>${mk.note}</p></button></li>`).join("")}</ul>
+    <p class="peptide">Peptide bond: <code>…C(=O)–OH</code> of one residue + <code>H–N…</code> of the next → <code>…C(=O)–NH…</code> + H₂O.</p>`;
+  info.querySelectorAll(".mark").forEach(b=>{
+    const k=+b.dataset.k;
+    b.addEventListener("mouseenter",()=>{main.focus=k;});
+    b.addEventListener("mouseleave",()=>{if(!b.classList.contains("on"))main.focus=-1;});
+    b.addEventListener("click",()=>{const on=!b.classList.contains("on");info.querySelectorAll(".mark").forEach(x=>x.classList.remove("on"));if(on){b.classList.add("on");main.focus=k;}else main.focus=-1;});
+  });
+}
+
+const tog=(id,fn)=>{const b=document.getElementById(id);b.onclick=()=>{const v=b.getAttribute("aria-pressed")!=="true";b.setAttribute("aria-pressed",v);fn(v);};};
+tog("tLabels",v=>main.labels=v);
+tog("tH",v=>main.showH=v);
+const spinBtn=document.getElementById("tSpin"); if(reduce) spinBtn.setAttribute("aria-pressed","false");
+tog("tSpin",v=>main.spin=v);
+document.getElementById("tReset").onclick=()=>{main.set(main.m);};
+
+select(DATA.findIndex(d=>d.code3==="Lys"));
+
+let last=performance.now();
+function loop(t){const dt=Math.min(.05,(t-last)/1000);last=t;viewers.forEach(v=>v.tick(dt,t));requestAnimationFrame(loop);}
+requestAnimationFrame(loop);
+</script>
+
+</body></html>
